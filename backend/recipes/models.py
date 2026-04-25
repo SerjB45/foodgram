@@ -1,7 +1,6 @@
-from django.db import models
-
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
+from django.db import models
 
 User = get_user_model()
 
@@ -41,7 +40,12 @@ class Recipe(models.Model):
         User, on_delete=models.CASCADE, related_name='recipes',
         verbose_name='Автор'
     )
-    image = models.ImageField(upload_to='recipes/', verbose_name='Изображение')
+    image = models.ImageField(
+        upload_to='recipes_media/',
+        verbose_name='Изображение',
+        blank=True,
+        null=True,
+    )
     text = models.TextField(verbose_name='Описание')
     ingredients = models.ManyToManyField(
         Ingredient, through='RecipeIngredient', verbose_name='Ингредиенты'

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Tag, Ingredient, Recipe
+from .models import Ingredient, Recipe, Tag
 
 
 @admin.register(Tag)
@@ -19,6 +19,20 @@ class IngredientAdmin(admin.ModelAdmin):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'author', 'cooking_time')
-    search_fields = ('name', 'author__username')
-    list_filter = ('name', 'author__username')
+    list_display = (
+        'name', 'author', 'cooking_time', 'get_favorites', 'get_tags'
+    )
+    search_fields = ('name', 'author', 'tags')
+    list_filter = ('name', 'author')
+
+    def get_favorites(self, obj):
+        return obj.favorites.count()
+
+    get_favorites.short_description = (
+        'Количество добавлений рецепта в избранное'
+    )
+
+    def get_tags(self, obj):
+        return '\n'.join(obj.tags.values_list('name', flat=True))
+
+    get_tags.short_description = 'Теги рецепта'

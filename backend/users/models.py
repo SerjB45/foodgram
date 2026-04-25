@@ -1,6 +1,14 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+ADMIN = 'admin'
+USER = 'user'
+
+USERS_ROLE = (
+    (USER, 'User'),
+    (ADMIN, 'Admin'),
+)
+
 
 class User(AbstractUser):
 
@@ -32,7 +40,14 @@ class User(AbstractUser):
         null=True,
         verbose_name='Аватар',
     )
-    
+
+    role = models.CharField(
+        max_length=10,
+        choices=USERS_ROLE,
+        default=USER,
+        verbose_name='Роль',
+    )
+
     class Meta:
         ordering = ('id',)
         constraints = [
@@ -46,3 +61,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+
+    @property
+    def is_admin(self):
+        return (
+            self.role == ADMIN
+            or self.is_superuser
+            or self.is_staff
+        )
