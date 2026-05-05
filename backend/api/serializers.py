@@ -9,6 +9,8 @@ from rest_framework import serializers
 from bookmark.models import Favorite, ShoppingList
 from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
 
+from .utils import UserUtils, ValidationUtils
+
 USERNAME_REGEX = r'^[\w.@+-]+\Z'
 
 User = get_user_model()
@@ -132,13 +134,13 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     def get_is_favorited(self, obj):
         request = self.context.get('request')
-        if request is None or request.user.is_anonymous:
+        if not UserUtils.is_user_authenticated(request):
             return False
         return Favorite.objects.filter(user=request.user, recipe=obj).exists()
 
     def get_is_in_shopping_cart(self, obj):
         request = self.context.get('request')
-        if request is None or request.user.is_anonymous:
+        if not UserUtils.is_user_authenticated(request):
             return False
         return ShoppingList.objects.filter(
             user=request.user,
@@ -149,14 +151,15 @@ class RecipeSerializer(serializers.ModelSerializer):
         ingredients_data = self.initial_data.get('ingredients', [])
         tags_data = self.initial_data.get('tags', [])
 
+        self._validate_ingredients(ingredients_data)
+        self._validate_tags(tags_data)
+        return data
+
+    def _validate_ingredients(self, ingredients_data):
+        """Валидация ингредиентов."""
         if not ingredients_data:
             raise serializers.ValidationError(
                 {'ingredients': 'Должен быть указан хотя бы один ингредиент.'}
-            )
-
-        if not tags_data:
-            raise serializers.ValidationError(
-                {'tags': 'Должен быть указан хотя бы один тег.'}
             )
 
         ingredient_ids = set()
@@ -164,7 +167,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             ingredient_id = item.get('id')
             amount = item.get('amount', 0)
 
-            if amount <= 0:
+            if not ValidationUtils.validate_positive_amount(amount):
                 raise serializers.ValidationError(
                     {'ingredients':
                         'Количество ингредиента должно быть положительным.'
@@ -176,34 +179,35 @@ class RecipeSerializer(serializers.ModelSerializer):
                 )
             ingredient_ids.add(ingredient_id)
 
+        valid, missing = ValidationUtils.validate_unique_ids(
+            ingredient_ids, Ingredient
+        )
+        if not valid:
+            raise serializers.ValidationError(
+                {'ingredients':
+                    f'Ингредиенты с id {missing} не найдены.'
+                 }
+            )
+
+    def _validate_tags(self, tags_data):
+        """Валидация тегов."""
+        if not tags_data:
+            raise serializers.ValidationError(
+                {'tags': 'Должен быть указан хотя бы один тег.'}
+            )
+
         if len(tags_data) != len(set(tags_data)):
             raise serializers.ValidationError(
                 {'tags': 'Теги должны быть уникальными.'}
             )
 
-        if tags_data:
-            existing_tags = Tag.objects.filter(id__in=tags_data)
-            if existing_tags.count() != len(tags_data):
-                missing_ids = set(tags_data) - \
-                    set(existing_tags.values_list('id', flat=True))
-                raise serializers.ValidationError(
-                    {'tags': f'Теги с id {list(missing_ids)} не найдены.'}
-                )
-        if ingredients_data:
-            existing_ingredients = Ingredient.objects.filter(
-                id__in=[item.get('id') for item in ingredients_data]
+        valid, missing = ValidationUtils.validate_unique_ids(
+            tags_data, Tag
+        )
+        if not valid:
+            raise serializers.ValidationError(
+                {'tags': f'Теги с id {missing} не найдены.'}
             )
-            if existing_ingredients.count() != len(ingredients_data):
-                missing_ids = set(
-                    item.get('id') for item in ingredients_data
-                ) - set(existing_ingredients.values_list('id', flat=True))
-                raise serializers.ValidationError(
-                    {'ingredients':
-                        f'Ингредиенты с id {list(missing_ids)} не найдены.'
-                     }
-                )
-
-        return data
 
     def to_internal_value(self, data):
         result = super().to_internal_value(data)

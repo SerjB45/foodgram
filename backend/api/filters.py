@@ -16,9 +16,9 @@ class IngredientFilter(django_filters.FilterSet):
 
 class BaseRecipeFilter(django_filters.FilterSet):
 
-    is_favorited = django_filters.CharFilter(method='filter_by_favorited')
+    is_favorited = django_filters.CharFilter(method='filter_by_bool_field')
     is_in_shopping_cart = django_filters.CharFilter(
-        method='filter_by_shopping_cart')
+        method='filter_by_bool_field')
 
     def _parse_bool(self, value):
         if isinstance(value, bool):
@@ -48,6 +48,19 @@ class BaseRecipeFilter(django_filters.FilterSet):
 
         return super().filter_queryset(queryset)
 
+    def filter_by_bool_field(self, queryset, name, value):
+        """Универсальный фильтр для булевых полей."""
+        user = self.request.user
+
+        if not user.is_authenticated:
+            return queryset.none()
+
+        bool_value = self._parse_bool(value)
+        if bool_value is None:
+            return queryset
+
+        return queryset.filter(**{name: bool_value})
+
 
 class RecipeFilter(BaseRecipeFilter):
 
@@ -57,27 +70,3 @@ class RecipeFilter(BaseRecipeFilter):
     class Meta:
         model = Recipe
         fields = []
-
-    def filter_by_favorited(self, queryset, name, value):
-        user = self.request.user
-
-        if not user.is_authenticated:
-            return queryset.none()
-
-        bool_value = self._parse_bool(value)
-        if bool_value is None:
-            return queryset
-
-        return queryset.filter(is_favorited=bool_value)
-
-    def filter_by_shopping_cart(self, queryset, name, value):
-        user = self.request.user
-
-        if not user.is_authenticated:
-            return queryset.none()
-
-        bool_value = self._parse_bool(value)
-        if bool_value is None:
-            return queryset
-
-        return queryset.filter(is_in_shopping_cart=bool_value)

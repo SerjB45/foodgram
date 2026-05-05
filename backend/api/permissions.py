@@ -9,14 +9,6 @@ class IsAdminRole(BasePermission):
         )
 
 
-# class IsAdminOrReadOnly(IsAdminRole):
-#     def has_permission(self, request, view):
-#         return (
-#             request.method in SAFE_METHODS
-#             or super().has_permission(request, view)
-#         )
-
-
 class IsAuthorOrAdminOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         if request.method == 'POST':

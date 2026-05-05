@@ -1,25 +1,26 @@
-from rest_framework.pagination import LimitOffsetPagination
+import base64
+
+from django.shortcuts import get_object_or_404, redirect
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
-from django.shortcuts import redirect, get_object_or_404
-import base64
 
 from bookmark.models import Favorite, Follow, ShoppingList
 from recipes.models import Ingredient, Recipe, ShortLink, Tag
 from users.models import User
 
 from .filters import IngredientFilter, RecipeFilter
+from .mixins import RecipeActionMixin
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrAdminOrReadOnly
 from .serializers import (AvatarSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeSerializer,
-                          ShortRecipeSerializer, SubscriptionSerializer,
-                          TagSerializer)
+                          SubscriptionSerializer, TagSerializer)
 
 
 class CustomUserViewSet(UserViewSet):
@@ -135,7 +136,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
 
-class RecipeViewSet(viewsets.ModelViewSet):
+class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
     permission_classes = (IsAuthorOrAdminOrReadOnly,)
@@ -157,27 +158,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         url_path='favorite',
     )
     def favorite(self, request, pk=None):
-        user = request.user
-        recipe = self.get_object()
-
-        if request.method == 'POST':
-            if Favorite.objects.filter(user=user, recipe=recipe).exists():
-                return Response(
-                    {'errors': 'Рецепт уже в избранном'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            Favorite.objects.create(user=user, recipe=recipe)
-            serializer = ShortRecipeSerializer(recipe)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        favorite = Favorite.objects.filter(user=user, recipe=recipe)
-        if not favorite.exists():
-            return Response(
-                {'errors': 'Рецепта нет в избранном'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        favorite.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return self._toggle_recipe_action(
+            request, Favorite,
+            'Рецепт уже в избранном',
+            'Рецепта нет в избранном'
+        )
 
     @action(
         detail=True,
@@ -186,27 +171,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         url_path='shopping_cart',
     )
     def shopping_cart(self, request, pk=None):
-        user = request.user
-        recipe = self.get_object()
-
-        if request.method == 'POST':
-            if ShoppingList.objects.filter(user=user, recipe=recipe).exists():
-                return Response(
-                    {'errors': 'Рецепт уже в списке покупок'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            ShoppingList.objects.create(user=user, recipe=recipe)
-            serializer = ShortRecipeSerializer(recipe)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        shopping_cart = ShoppingList.objects.filter(user=user, recipe=recipe)
-        if not shopping_cart.exists():
-            return Response(
-                {'errors': 'Рецепта нет в списке покупок'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        shopping_cart.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return self._toggle_recipe_action(
+            request, ShoppingList,
+            'Рецепт уже в списке покупок',
+            'Рецепта нет в списке покупок'
+        )
 
     @action(
         detail=True,
