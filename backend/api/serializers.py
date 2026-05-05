@@ -163,6 +163,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         for item in ingredients_data:
             ingredient_id = item.get('id')
             amount = item.get('amount', 0)
+
             if amount <= 0:
                 raise serializers.ValidationError(
                     {'ingredients':
@@ -180,6 +181,28 @@ class RecipeSerializer(serializers.ModelSerializer):
                 {'tags': 'Теги должны быть уникальными.'}
             )
 
+        if tags_data:
+            existing_tags = Tag.objects.filter(id__in=tags_data)
+            if existing_tags.count() != len(tags_data):
+                missing_ids = set(tags_data) - \
+                    set(existing_tags.values_list('id', flat=True))
+                raise serializers.ValidationError(
+                    {'tags': f'Теги с id {list(missing_ids)} не найдены.'}
+                )
+        if ingredients_data:
+            existing_ingredients = Ingredient.objects.filter(
+                id__in=[item.get('id') for item in ingredients_data]
+            )
+            if existing_ingredients.count() != len(ingredients_data):
+                missing_ids = set(
+                    item.get('id') for item in ingredients_data
+                ) - set(existing_ingredients.values_list('id', flat=True))
+                raise serializers.ValidationError(
+                    {'ingredients':
+                        f'Ингредиенты с id {list(missing_ids)} не найдены.'
+                     }
+                )
+
         return data
 
     def to_internal_value(self, data):
@@ -194,31 +217,15 @@ class RecipeSerializer(serializers.ModelSerializer):
         ingredients_data = validated_data.pop('ingredients_data', [])
         tags_data = validated_data.pop('tags_data', [])
 
-        if tags_data:
-            existing_tags = Tag.objects.filter(id__in=tags_data)
-            if existing_tags.count() != len(tags_data):
-                missing_ids = set(tags_data) - \
-                    set(existing_tags.values_list('id', flat=True))
-                raise serializers.ValidationError(
-                    {'tags': f'Теги с id {list(missing_ids)} не найдены.'}
-                )
-
         recipe = Recipe.objects.create(**validated_data)
 
         if tags_data:
             recipe.tags.set(tags_data)
 
         for ingredient_data in ingredients_data:
-            ingredient_id = ingredient_data.get('id')
             amount = ingredient_data.get('amount')
-            try:
-                ingredient = Ingredient.objects.get(id=ingredient_id)
-            except Ingredient.DoesNotExist:
-                raise serializers.ValidationError(
-                    {'ingredients':
-                        f'Ингредиент с id {ingredient_id} не найден.'
-                     }
-                )
+            ingredient = Ingredient.objects.get(id=ingredient_data.get('id'))
+
             RecipeIngredient.objects.create(
                 recipe=recipe,
                 ingredient=ingredient,
@@ -280,7 +287,7 @@ class UserMeSerializer(CustomUserSerializer):
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField()
-    recipes = ShortRecipeSerializer(many=True, read_only=True)
+    recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
     avatar = Base64ImageField(required=False, allow_null=True)
 
@@ -291,6 +298,23 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def get_is_subscribed(self, obj):
         return True
+
+    def get_recipes(self, obj):
+        request = self.context.get('request')
+        recipes = obj.recipes.all()
+        if request is not None:
+            limit = request.query_params.get('recipes_limit')
+            if limit is not None:
+                try:
+                    limit = int(limit)
+                    if limit >= 0:
+                        recipes = recipes[:limit]
+                except (TypeError, ValueError):
+                    pass
+        return ShortRecipeSerializer(
+            recipes, many=True,
+            context=self.context
+        ).data
 
     def get_recipes_count(self, obj):
         return obj.recipes.count()

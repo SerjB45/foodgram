@@ -1,3 +1,4 @@
+from rest_framework.pagination import LimitOffsetPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
 from rest_framework import status, viewsets
@@ -44,17 +45,17 @@ class CustomUserViewSet(UserViewSet):
     )
     def subscriptions(self, request):
         user = request.user
-        queryset = User.objects.filter(followers__user=user)
+        queryset = User.objects.filter(following__user=user)
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = CustomUserSerializer(
+            serializer = SubscriptionSerializer(
                 page,
                 many=True,
                 context={'request': request}
             )
             return self.get_paginated_response(serializer.data)
 
-        serializer = CustomUserSerializer(
+        serializer = SubscriptionSerializer(
             queryset,
             many=True,
             context={'request': request}
@@ -144,6 +145,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
     ordering = ('-pub_date',)
+    pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -232,6 +234,45 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response({
             "short-link": short_url
         }, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=('get',),
+        url_path='download_shopping_cart',
+        permission_classes=(IsAuthenticated,),
+    )
+    def download_shopping_cart(self, request):
+        user = request.user
+        shopping_list = ShoppingList.objects.filter(
+            user=user).select_related('recipe')
+        if not shopping_list.exists():
+            return Response(
+                {'errors': 'Список покупок пуст'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ingredients = {}
+        for item in shopping_list:
+            recipe_ingredients = item.recipe.recipe_ingredients.select_related(
+                'ingredient')
+            for ri in recipe_ingredients:
+                name = ri.ingredient.name
+                amount = ri.amount
+                unit = ri.ingredient.measurement_unit
+                if name in ingredients:
+                    ingredients[name]['amount'] += amount
+                else:
+                    ingredients[name] = {'amount': amount, 'unit': unit}
+
+        shop_list = 'Список покупок:\n\n'
+        for name, details in ingredients.items():
+            shop_list += f"{name}: {details['amount']} {details['unit']}\n"
+
+        response = Response(shop_list, content_type='text/plain')
+        response['Content-Disposition'] = (
+            'attachment; filename="shop_list.txt"'
+        )
+        return response
 
 
 def redirect_short_link(request, short_code):
