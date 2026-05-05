@@ -56,6 +56,12 @@ class Recipe(models.Model):
         verbose_name='Время приготовления (минуты)'
     )
 
+    pub_date = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата публикации',
+        null=True,
+    )
+
     class Meta:
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
@@ -92,4 +98,27 @@ class RecipeIngredient(models.Model):
         ]
 
     def __str__(self):
-        return f'{self.ingredient.name} в {self.recipe.name}'
+        return f'{self.recipe.name} - {self.ingredient.name}'
+
+
+class ShortLink(models.Model):
+    recipe = models.OneToOneField(
+        Recipe, on_delete=models.CASCADE,
+        related_name='short_link',
+        verbose_name='Рецепт'
+    )
+    short_code = models.CharField(
+        max_length=10, unique=True,
+        verbose_name='Короткий код'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата создания'
+    )
+
+    class Meta:
+        verbose_name = 'Короткая ссылка'
+        verbose_name_plural = 'Короткие ссылки'
+
+    def __str__(self):
+        return f'Short link for {self.recipe.name}: {self.short_code}'

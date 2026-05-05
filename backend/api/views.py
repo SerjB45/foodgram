@@ -5,18 +5,20 @@ from rest_framework.decorators import action
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
+from django.shortcuts import redirect, get_object_or_404
+import base64
 
 from bookmark.models import Favorite, Follow, ShoppingList
-from recipes.models import Ingredient, Recipe, Tag
+from recipes.models import Ingredient, Recipe, ShortLink, Tag
 from users.models import User
 
-from .filters import IngredientFilter
+from .filters import IngredientFilter, RecipeFilter
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrAdminOrReadOnly
 from .serializers import (AvatarSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeSerializer,
-                          TagSerializer, ShortRecipeSerializer,
-                          SubscriptionSerializer)
+                          ShortRecipeSerializer, SubscriptionSerializer,
+                          TagSerializer)
 
 
 class CustomUserViewSet(UserViewSet):
@@ -132,7 +134,6 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = (AllowAny,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = IngredientFilter
-    search_fields = ('^name',)
     pagination_class = None
 
 
@@ -141,10 +142,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
     serializer_class = RecipeSerializer
     permission_classes = (IsAuthorOrAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ('author', 'tags')
+    filterset_class = RecipeFilter
+    ordering = ('-pub_date',)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save()
 
     @action(
         detail=True,
@@ -209,3 +214,26 @@ class RecipeViewSet(viewsets.ModelViewSet):
             {'success': 'Рецепт удален из списка покупок'},
             status=status.HTTP_204_NO_CONTENT
         )
+
+    @action(
+        detail=True,
+        methods=('get',),
+        url_path='get-link',
+        permission_classes=(AllowAny,),
+    )
+    def get_link(self, request, pk=None):
+        recipe = self.get_object()
+        short_link, created = ShortLink.objects.get_or_create(
+            recipe=recipe,
+            defaults={'short_code': base64.urlsafe_b64encode(
+                str(recipe.id).encode()).decode()[:8]}
+        )
+        short_url = request.build_absolute_uri(f'/s/{short_link.short_code}/')
+        return Response({
+            "short-link": short_url
+        }, status=status.HTTP_200_OK)
+
+
+def redirect_short_link(request, short_code):
+    short_link = get_object_or_404(ShortLink, short_code=short_code)
+    return redirect(f'/recipes/{short_link.recipe.id}/')
