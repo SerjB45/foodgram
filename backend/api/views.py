@@ -1,0 +1,240 @@
+import base64
+
+from django.shortcuts import get_object_or_404, redirect
+from django_filters.rest_framework import DjangoFilterBackend
+from djoser.views import UserViewSet
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import (AllowAny, IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
+from rest_framework.response import Response
+
+from bookmark.models import Favorite, Follow, ShoppingList
+from recipes.models import Ingredient, Recipe, ShortLink, Tag
+from users.models import User
+
+from .filters import IngredientFilter, RecipeFilter
+from .mixins import RecipeActionMixin
+from .pagination import CustomPagination
+from .permissions import IsAuthorOrAdminOrReadOnly
+from .serializers import (AvatarSerializer, CustomUserSerializer,
+                          IngredientSerializer, RecipeSerializer,
+                          SubscriptionSerializer, TagSerializer)
+
+
+class CustomUserViewSet(UserViewSet):
+    queryset = User.objects.all()
+    serializer_class = CustomUserSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    pagination_class = CustomPagination
+
+    @action(
+        detail=False,
+        methods=('get', 'patch', 'put', 'delete'),
+        permission_classes=(IsAuthenticated,),
+        url_path='me',
+    )
+    def me(self, request, *args, **kwargs):
+        return super().me(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=('get',),
+        permission_classes=(IsAuthenticated,),
+        url_path='subscriptions',
+    )
+    def subscriptions(self, request):
+        user = request.user
+        queryset = User.objects.filter(following__user=user)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = SubscriptionSerializer(
+                page,
+                many=True,
+                context={'request': request}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = SubscriptionSerializer(
+            queryset,
+            many=True,
+            context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=('post', 'delete'),
+        permission_classes=(IsAuthenticated,),
+        url_path='subscribe',
+    )
+    def subscribe(self, request, *args, **kwargs):
+        user = request.user
+        author = self.get_object()
+
+        if request.method == 'POST':
+            if user == author:
+                return Response(
+                    {'errors': 'Нельзя подписаться на самого себя'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if Follow.objects.filter(user=user, author=author).exists():
+                return Response(
+                    {'errors': 'Вы уже подписаны на этого пользователя'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            Follow.objects.create(user=user, author=author)
+            serializer = SubscriptionSerializer(
+                author, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        follow = Follow.objects.filter(user=user, author=author)
+        if not follow.exists():
+            return Response(
+                {'errors': 'Вы не подписаны на этого пользователя'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        follow.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=False,
+        methods=('put', 'delete'),
+        url_path='me/avatar',
+        permission_classes=(IsAuthenticated,),
+    )
+    def avatar(self, request):
+        user = request.user
+
+        if request.method == 'DELETE':
+            user.avatar.delete(save=False)
+            user.avatar = None
+            user.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = AvatarSerializer(user, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TagViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = (AllowAny,)
+    pagination_class = None
+
+
+class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Ingredient.objects.all()
+    serializer_class = IngredientSerializer
+    permission_classes = (AllowAny,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = IngredientFilter
+    pagination_class = None
+
+
+class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
+    queryset = Recipe.objects.all()
+    serializer_class = RecipeSerializer
+    permission_classes = (IsAuthorOrAdminOrReadOnly,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = RecipeFilter
+    ordering = ('-pub_date',)
+    pagination_class = LimitOffsetPagination
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save()
+
+    @action(
+        detail=True,
+        methods=('post', 'delete'),
+        permission_classes=(IsAuthenticated,),
+        url_path='favorite',
+    )
+    def favorite(self, request, pk=None):
+        return self._toggle_recipe_action(
+            request, Favorite,
+            'Рецепт уже в избранном',
+            'Рецепта нет в избранном'
+        )
+
+    @action(
+        detail=True,
+        methods=('post', 'delete'),
+        permission_classes=(IsAuthenticated,),
+        url_path='shopping_cart',
+    )
+    def shopping_cart(self, request, pk=None):
+        return self._toggle_recipe_action(
+            request, ShoppingList,
+            'Рецепт уже в списке покупок',
+            'Рецепта нет в списке покупок'
+        )
+
+    @action(
+        detail=True,
+        methods=('get',),
+        url_path='get-link',
+        permission_classes=(AllowAny,),
+    )
+    def get_link(self, request, pk=None):
+        recipe = self.get_object()
+        short_link, created = ShortLink.objects.get_or_create(
+            recipe=recipe,
+            defaults={'short_code': base64.urlsafe_b64encode(
+                str(recipe.id).encode()).decode()[:8]}
+        )
+        short_url = request.build_absolute_uri(f'/s/{short_link.short_code}/')
+        return Response({
+            "short-link": short_url
+        }, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=('get',),
+        url_path='download_shopping_cart',
+        permission_classes=(IsAuthenticated,),
+    )
+    def download_shopping_cart(self, request):
+        user = request.user
+        shopping_list = ShoppingList.objects.filter(
+            user=user).select_related('recipe')
+        if not shopping_list.exists():
+            return Response(
+                {'errors': 'Список покупок пуст'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        ingredients = {}
+        for item in shopping_list:
+            recipe_ingredients = item.recipe.recipe_ingredients.select_related(
+                'ingredient')
+            for ri in recipe_ingredients:
+                name = ri.ingredient.name
+                amount = ri.amount
+                unit = ri.ingredient.measurement_unit
+                if name in ingredients:
+                    ingredients[name]['amount'] += amount
+                else:
+                    ingredients[name] = {'amount': amount, 'unit': unit}
+
+        shop_list = 'Список покупок:\n\n'
+        for name, details in ingredients.items():
+            shop_list += f"{name}: {details['amount']} {details['unit']}\n"
+
+        response = Response(shop_list, content_type='text/plain')
+        response['Content-Disposition'] = (
+            'attachment; filename="shop_list.txt"'
+        )
+        return response
+
+
+def redirect_short_link(request, short_code):
+    short_link = get_object_or_404(ShortLink, short_code=short_code)
+    return redirect(f'/recipes/{short_link.recipe.id}/')
