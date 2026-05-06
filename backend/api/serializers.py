@@ -1,12 +1,13 @@
 import base64
 import mimetypes
 
-from bookmark.models import Favorite, ShoppingList
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from djoser.serializers import UserCreateSerializer
-from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
 from rest_framework import serializers
+
+from bookmark.models import Favorite, ShoppingList
+from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
 
 from .utils import UserUtils, ValidationUtils
 
