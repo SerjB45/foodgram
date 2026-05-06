@@ -40,6 +40,6 @@ class RecipeAdmin(admin.ModelAdmin):
 
 @admin.register(ShortLink)
 class ShortLinkAdmin(admin.ModelAdmin):
-    list_display = ('url', 'short_url')
-    search_fields = ('url', 'short_url')
-    list_filter = ('url', 'short_url')
+    list_display = ('recipe', 'short_code')
+    search_fields = ('recipe', 'short_code')
+    list_filter = ('recipe', 'short_code')
