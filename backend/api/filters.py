@@ -1,7 +1,6 @@
 import django_filters
-from django.db.models import Exists, OuterRef
-
 from bookmark.models import Favorite, ShoppingList
+from django.db.models import Exists, OuterRef
 from recipes.models import Ingredient, Recipe
 
 
