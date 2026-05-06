@@ -6,8 +6,11 @@ from djoser.views import UserViewSet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import (AllowAny, IsAuthenticated,
-                                        IsAuthenticatedOrReadOnly)
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
 
 from bookmark.models import Favorite, Follow, ShoppingList
@@ -18,9 +21,14 @@ from .filters import IngredientFilter, RecipeFilter
 from .mixins import RecipeActionMixin
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrAdminOrReadOnly
-from .serializers import (AvatarSerializer, CustomUserSerializer,
-                          IngredientSerializer, RecipeSerializer,
-                          SubscriptionSerializer, TagSerializer)
+from .serializers import (
+    AvatarSerializer,
+    CustomUserSerializer,
+    IngredientSerializer,
+    RecipeSerializer,
+    SubscriptionSerializer,
+    TagSerializer,
+)
 
 
 class CustomUserViewSet(UserViewSet):

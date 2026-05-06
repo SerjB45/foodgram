@@ -11,6 +11,7 @@ from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
 
 from .utils import UserUtils, ValidationUtils
 
+
 USERNAME_REGEX = r'^[\w.@+-]+\Z'
 
 User = get_user_model()
