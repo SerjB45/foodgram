@@ -105,7 +105,7 @@ jobs:
         with:
           context: ./frontend/
           push: true
-          tags: sergey345bk/foodgraam_frontend:latest
+          tags: sergey345bk/foodgram_frontend:latest
 
   build_gateway_and_push_to_docker_hub:
     name: Push gateway Docker image to DockerHub
