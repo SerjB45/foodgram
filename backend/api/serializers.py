@@ -82,6 +82,24 @@ class CustomUserCreateSerializer(CustomUserSerializer):
                   'first_name', 'last_name', 'password')
         extra_kwargs = {'password': {'write_only': True}}
 
+    def validate(self, data):
+        username = data.get('username')
+        email = data.get('email')
+
+        if User.objects.filter(username=username, email=email).exists():
+            raise serializers.ValidationError(
+                'Пользователь с таким username и email уже существует.'
+            )
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError(
+                {'username': 'Пользователь с таким username уже существует.'}
+            )
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError(
+                {'email': 'Пользователь с таким email уже существует.'}
+            )
+        return data
+
 
 class IngredientSerializer(serializers.ModelSerializer):
 

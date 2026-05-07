@@ -19,7 +19,7 @@ urlpatterns = [
     path('', include(router.urls)),
     path('auth/', include('djoser.urls')),
     path('auth/', include('djoser.urls.authtoken')),
-    path('s/<str:short_code>/', redirect_short_link,
+    path(r's/<str:short_code>/', redirect_short_link,
          name='short_link_redirect'
          ),
 ]

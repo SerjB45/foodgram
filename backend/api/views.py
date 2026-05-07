@@ -1,34 +1,26 @@
 import base64
 
+from bookmark.models import Favorite, Follow, ShoppingList
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
+from recipes.models import Ingredient, Recipe, ShortLink, Tag
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.permissions import (
-    AllowAny,
-    IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-)
+from rest_framework.permissions import (AllowAny, IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
-
-from bookmark.models import Favorite, Follow, ShoppingList
-from recipes.models import Ingredient, Recipe, ShortLink, Tag
 from users.models import User
 
 from .filters import IngredientFilter, RecipeFilter
 from .mixins import RecipeActionMixin
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrAdminOrReadOnly
-from .serializers import (
-    AvatarSerializer,
-    CustomUserSerializer,
-    IngredientSerializer,
-    RecipeSerializer,
-    SubscriptionSerializer,
-    TagSerializer,
-)
+from .serializers import (AvatarSerializer, CustomUserSerializer,
+                          IngredientSerializer, RecipeSerializer,
+                          SubscriptionSerializer, TagSerializer)
 
 
 class CustomUserViewSet(UserViewSet):
@@ -198,7 +190,11 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
             defaults={'short_code': base64.urlsafe_b64encode(
                 str(recipe.id).encode()).decode()[:8]}
         )
-        short_url = request.build_absolute_uri(f'/s/{short_link.short_code}/')
+        short_path = reverse(
+            'short_link_redirect',
+            args=[short_link.short_code]
+        )
+        short_url = request.build_absolute_uri(short_path)
         return Response({
             "short-link": short_url
         }, status=status.HTTP_200_OK)
@@ -236,7 +232,10 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         for name, details in ingredients.items():
             shop_list += f"{name}: {details['amount']} {details['unit']}\n"
 
-        response = Response(shop_list, content_type='text/plain')
+        response = Response(
+            shop_list,
+            content_type='text/plain; charset=utf-8'
+        )
         response['Content-Disposition'] = (
             'attachment; filename="shop_list.txt"'
         )
