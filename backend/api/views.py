@@ -2,6 +2,7 @@ import base64
 
 from bookmark.models import Favorite, Follow, ShoppingList
 from django.shortcuts import get_object_or_404, redirect
+from django.http import HttpResponse
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
@@ -232,7 +233,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         for name, details in ingredients.items():
             shop_list += f"{name}: {details['amount']} {details['unit']}\n"
 
-        response = Response(
+        response = HttpResponse(
             shop_list,
             content_type='text/plain; charset=utf-8'
         )
