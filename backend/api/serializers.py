@@ -154,10 +154,29 @@ class RecipeSerializer(serializers.ModelSerializer):
 
         self._validate_ingredients(ingredients_data)
         self._validate_tags(tags_data)
+        self._validate_cooking_time(data.get('cooking_time'))
         return data
 
+    def _validate_cooking_time(self, cooking_time):
+        try:
+            cooking_time = int(cooking_time)
+        except (ValueError, TypeError):
+            raise serializers.ValidationError(
+                {
+                    'cooking_time':
+                        'Некорректное значение времени приготовления.'
+                }
+            )
+        if not ValidationUtils.validate_positive_amount(cooking_time):
+            raise serializers.ValidationError(
+                {
+                    'cooking_time':
+                        'Время приготовления должно быть положительным.'
+                }
+            )
+
     def _validate_ingredients(self, ingredients_data):
-        """Валидация ингредиентов."""
+
         if not ingredients_data:
             raise serializers.ValidationError(
                 {'ingredients': 'Должен быть указан хотя бы один ингредиент.'}
@@ -166,13 +185,22 @@ class RecipeSerializer(serializers.ModelSerializer):
         ingredient_ids = set()
         for item in ingredients_data:
             ingredient_id = item.get('id')
-            amount = item.get('amount', 0)
+            try:
+                amount = int(item.get('amount', 0))
+            except (ValueError, TypeError):
+                raise serializers.ValidationError(
+                    {
+                        'ingredients':
+                            'Некорректное значение количества ингредиента.'
+                    }
+                )
 
             if not ValidationUtils.validate_positive_amount(amount):
                 raise serializers.ValidationError(
-                    {'ingredients':
+                    {
+                        'ingredients':
                         'Количество ингредиента должно быть положительным.'
-                     }
+                    }
                 )
             if ingredient_id in ingredient_ids:
                 raise serializers.ValidationError(
@@ -191,7 +219,6 @@ class RecipeSerializer(serializers.ModelSerializer):
             )
 
     def _validate_tags(self, tags_data):
-        """Валидация тегов."""
         if not tags_data:
             raise serializers.ValidationError(
                 {'tags': 'Должен быть указан хотя бы один тег.'}
