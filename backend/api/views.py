@@ -9,7 +9,6 @@ from djoser.views import UserViewSet
 from recipes.models import Ingredient, Recipe, ShortLink, Tag
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
@@ -144,7 +143,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
     ordering = ('-pub_date',)
-    pagination_class = LimitOffsetPagination
+    pagination_class = CustomPagination
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
