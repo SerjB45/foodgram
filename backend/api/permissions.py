@@ -1,14 +1,6 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 
-class IsAdminRole(BasePermission):
-    def has_permission(self, request, view):
-        user = request.user
-        return bool(
-            user.is_authenticated and user.is_admin
-        )
-
-
 class IsAuthorOrAdminOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         if request.method == 'POST':
