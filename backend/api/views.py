@@ -142,7 +142,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
     permission_classes = (IsAuthorOrAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
-    ordering = ('-pub_date',)
+    ordering = ('-id',)
     pagination_class = CustomPagination
 
     def perform_create(self, serializer):
