@@ -34,4 +34,3 @@ class Base64ImageField(serializers.ImageField):
             return super().to_representation(value)
 
         return f'data:{mime_type};base64,{data}'
-

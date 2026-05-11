@@ -91,7 +91,6 @@ class CustomUserViewSet(UserViewSet):
                 author, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-
         if not follow.exists():
             return Response(
                 {'errors': 'Вы не подписаны на этого пользователя'},

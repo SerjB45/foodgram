@@ -329,7 +329,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {
                             'recipes_limit':
-                                'Ошибка при получении рецептов по ограничению кол-ва.'}
+                                'Ошибка при получении лимита рецептов.'}
                     )
 
         return ShortRecipeSerializer(
