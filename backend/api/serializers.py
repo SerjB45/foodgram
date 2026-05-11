@@ -1,51 +1,16 @@
-import base64
-import mimetypes
-
 from django.contrib.auth import get_user_model
-from django.core.files.base import ContentFile
 from djoser.serializers import UserCreateSerializer
 from rest_framework import serializers
 
 from bookmark.models import Favorite, ShoppingList
 from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
-
+from .fields import Base64ImageField
 from .utils import UserUtils, ValidationUtils
 
 
 USERNAME_REGEX = r'^[\w.@+-]+\Z'
 
 User = get_user_model()
-
-
-class Base64ImageField(serializers.ImageField):
-    def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith('data:image'):
-            format, imgstr = data.split(';base64,')
-            ext = format.split('/')[-1]
-
-            data = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
-
-        return super().to_internal_value(data)
-
-    def to_representation(self, value):
-        if not value:
-            return None
-        try:
-            file_path = value.path
-        except Exception:
-            return super().to_representation(value)
-
-        mime_type, _ = mimetypes.guess_type(file_path)
-        if mime_type is None:
-            mime_type = 'application/octet-stream'
-
-        try:
-            with value.open('rb') as f:
-                data = base64.b64encode(f.read()).decode()
-        except Exception:
-            return super().to_representation(value)
-
-        return f'data:{mime_type};base64,{data}'
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -269,8 +234,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
         recipe = Recipe.objects.create(**validated_data)
 
-        if tags_data:
-            recipe.tags.set(tags_data)
+        recipe.tags.set(tags_data)
 
         for ingredient_data in ingredients_data:
             amount = ingredient_data.get('amount')
@@ -297,21 +261,18 @@ class RecipeSerializer(serializers.ModelSerializer):
         if image:
             instance.image = image
 
-        if tags_data:
-            instance.tags.set(tags_data)
-
-        if ingredients_data:
-            instance.recipe_ingredients.all().delete()
-            for ingredient_data in ingredients_data:
-                amount = ingredient_data.get('amount')
-                ingredient = Ingredient.objects.get(
-                    id=ingredient_data.get('id')
-                )
-                RecipeIngredient.objects.create(
-                    recipe=instance,
-                    ingredient=ingredient,
-                    amount=amount
-                )
+        instance.tags.set(tags_data)
+        instance.recipe_ingredients.all().delete()
+        for ingredient_data in ingredients_data:
+            amount = ingredient_data.get('amount')
+            ingredient = Ingredient.objects.get(
+                id=ingredient_data.get('id')
+            )
+            RecipeIngredient.objects.create(
+                recipe=instance,
+                ingredient=ingredient,
+                amount=amount
+            )
 
         instance.save()
         return instance
@@ -365,7 +326,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                     if limit >= 0:
                         recipes = recipes[:limit]
                 except (TypeError, ValueError):
-                    pass
+                    raise serializers.ValidationError(
+                        {
+                            'recipes_limit':
+                                'Ошибка при получении рецептов по ограничению кол-ва.'}
+                    )
+
         return ShortRecipeSerializer(
             recipes, many=True,
             context=self.context

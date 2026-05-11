@@ -11,9 +11,10 @@ class RecipeActionMixin:
 
         user = request.user
         recipe = self.get_object()
+        item = model.objects.filter(user=user, recipe=recipe)
 
         if request.method == 'POST':
-            if model.objects.filter(user=user, recipe=recipe).exists():
+            if item.exists():
                 return Response(
                     {'errors': error_exists_msg},
                     status=status.HTTP_400_BAD_REQUEST
@@ -22,7 +23,6 @@ class RecipeActionMixin:
             serializer = ShortRecipeSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        item = model.objects.filter(user=user, recipe=recipe)
         if not item.exists():
             return Response(
                 {'errors': error_not_found_msg},

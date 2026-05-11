@@ -1,20 +1,20 @@
 import base64
 
-from bookmark.models import Favorite, Follow, ShoppingList
 from django.shortcuts import get_object_or_404, redirect
 from django.http import HttpResponse
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
-from recipes.models import Ingredient, Recipe, ShortLink, Tag
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
-from users.models import User
 
+from bookmark.models import Favorite, Follow, ShoppingList
+from recipes.models import Ingredient, Recipe, ShortLink, Tag
+from users.models import User
 from .filters import IngredientFilter, RecipeFilter
 from .mixins import RecipeActionMixin
 from .pagination import CustomPagination
@@ -73,6 +73,7 @@ class CustomUserViewSet(UserViewSet):
     def subscribe(self, request, *args, **kwargs):
         user = request.user
         author = self.get_object()
+        follow = Follow.objects.filter(user=user, author=author)
 
         if request.method == 'POST':
             if user == author:
@@ -80,7 +81,7 @@ class CustomUserViewSet(UserViewSet):
                     {'errors': 'Нельзя подписаться на самого себя'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            if Follow.objects.filter(user=user, author=author).exists():
+            if follow.exists():
                 return Response(
                     {'errors': 'Вы уже подписаны на этого пользователя'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -90,7 +91,7 @@ class CustomUserViewSet(UserViewSet):
                 author, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        follow = Follow.objects.filter(user=user, author=author)
+
         if not follow.exists():
             return Response(
                 {'errors': 'Вы не подписаны на этого пользователя'},
@@ -149,9 +150,6 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
-
-    def perform_update(self, serializer):
-        serializer.save()
 
     @action(
         detail=True,
@@ -242,6 +240,27 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
             'attachment; filename="shop_list.txt"'
         )
         return response
+
+
+class StaticPagesViewSet(viewsets.ViewSet):
+    # Список доступных страниц
+    pages = {
+        'about': {'title': 'О проекте'},
+        'technologies': {'title': 'Технологии'}
+    }
+
+    def list(self, request):
+        titles = {slug: data['title'] for slug, data in self.pages.items()}
+        return Response(titles)
+
+    def retrieve(self, request, pk=None):
+        if pk in self.pages:
+            return Response(self.pages[pk])
+        else:
+            return Response(
+                {'error': 'Страница не найдена'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 def redirect_short_link(request, short_code):
