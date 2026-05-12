@@ -1,8 +1,8 @@
 volumes:
   pg_data_production:
-  static_volume:
+  backend_static:
   media_volume:
-  frontend_volume:
+  frontend_static:
 
 services:
   db:
@@ -14,7 +14,7 @@ services:
     image: sergey345bk/foodgram_backend
     env_file: .env
     volumes:
-      - static_volume:/backend_static
+      - backend_static:/app/collected_static
       - media_volume:/media
     depends_on:
       - db  
@@ -23,7 +23,7 @@ services:
     env_file: .env
     command: cp -r /app/build/. /frontend_static/
     volumes:
-      - static_volume:/frontend_static
+      - frontend_static:/frontend_static
       - media_volume:/media
   gateway:
     image: sergey345bk/foodgram_gateway
@@ -31,10 +31,10 @@ services:
     ports:
       - 8000:80
     volumes:
-      - static_volume:/staticfiles
+      - backend_static:/staticfiles
+      - frontend_static:/usr/share/nginx/html
       - media_volume:/media
-      - ../docs:/usr/share/nginx/html/api/docs/
-      - frontend_volume:/usr/share/nginx/html
+      - ./docs:/usr/share/nginx/html/api/docs/
     depends_on:
       - backend
       - frontend  
