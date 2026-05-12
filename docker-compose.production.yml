@@ -3,6 +3,7 @@ volumes:
   static_volume:
   media_volume:
   frontend_volume:
+  docs_volume:
 services:
   db:
     image: postgres:14.22
@@ -32,7 +33,7 @@ services:
     volumes:
       - static_volume:/staticfiles
       - media_volume:/media
-      - docs/:/usr/share/nginx/html/api/docs/
+      - docs_volume:/usr/share/nginx/html/api/docs/
       - frontend_volume:/usr/share/nginx/html
     depends_on:
       - backend
