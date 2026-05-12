@@ -5,6 +5,7 @@ from .serializers import ShortRecipeSerializer
 
 
 class RecipeActionMixin:
+    """Миксин для обработки действий с рецептами."""
 
     def _toggle_recipe_action(self, request, model, error_exists_msg,
                               error_not_found_msg):

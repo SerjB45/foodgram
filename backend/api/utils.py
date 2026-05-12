@@ -1,4 +1,5 @@
 class ValidationUtils:
+    """Утилита для валидации данных."""
 
     @staticmethod
     def validate_unique_ids(ids, model_class, id_name='id'):
@@ -17,6 +18,7 @@ class ValidationUtils:
 
 
 class UserUtils:
+    """Утилиты для работы с пользователями."""
 
     @staticmethod
     def is_user_authenticated(request):

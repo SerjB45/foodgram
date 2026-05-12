@@ -2,6 +2,9 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 
 class IsAuthorOrAdminOrReadOnly(BasePermission):
+    """Разрешение для доступа к объекту только автору или администратору,
+    иначе - только чтение."""
+
     def has_permission(self, request, view):
         if request.method == 'POST':
             return request.user.is_authenticated

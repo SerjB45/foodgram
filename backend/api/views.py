@@ -21,8 +21,9 @@ from .mixins import RecipeActionMixin
 from .pagination import CustomPagination
 from .permissions import IsAuthorOrAdminOrReadOnly
 from .serializers import (AvatarSerializer, CustomUserSerializer,
-                          IngredientSerializer, RecipeSerializer,
-                          SubscriptionSerializer, TagSerializer)
+                          IngredientSerializer, RecipeWriteSerializer,
+                          RecipeReadSerializer, SubscriptionSerializer,
+                          TagSerializer)
 
 
 class CustomUserViewSet(UserViewSet):
@@ -139,7 +140,6 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
     permission_classes = (IsAuthorOrAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = RecipeFilter
@@ -147,15 +147,11 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
     ordering = ('-id',)
     pagination_class = CustomPagination
 
-    # def get_serializer_class(self):
-    #     """
-    #     Определяем, какой сериализатор использовать.
-    #     Для 'list' и 'retrieve' (чтение) используем RecipeReadSerializer.
-    #     Для остальных (создание, редактирование) — RecipeWriteSerializer.
-    #     """
-    #     if self.action in ['list', 'retrieve']:
-    #         return RecipeReadSerializer
-    #     return RecipeWriteSerializer
+    def get_serializer_class(self):
+        """Определяем, какой сериализатор использовать."""
+        if self.action in ['list', 'retrieve']:
+            return RecipeReadSerializer
+        return RecipeWriteSerializer
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)

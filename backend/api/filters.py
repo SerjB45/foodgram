@@ -6,6 +6,7 @@ from recipes.models import Ingredient, Recipe
 
 
 class IngredientFilter(django_filters.FilterSet):
+    """Фильтр для ингредиентов по началу названия."""
 
     name = django_filters.CharFilter(lookup_expr='istartswith')
 
@@ -15,6 +16,7 @@ class IngredientFilter(django_filters.FilterSet):
 
 
 class BaseRecipeFilter(django_filters.FilterSet):
+    """Базовый фильтр для рецептов"""
 
     is_favorited = django_filters.CharFilter(method='filter_by_bool_field')
     is_in_shopping_cart = django_filters.CharFilter(
@@ -63,7 +65,7 @@ class BaseRecipeFilter(django_filters.FilterSet):
 
 
 class RecipeFilter(BaseRecipeFilter):
-
+    """Фильтр для рецептов."""
     tags = django_filters.AllValuesMultipleFilter(field_name='tags__slug')
     author = django_filters.NumberFilter(field_name='author__id')
 
