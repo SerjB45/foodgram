@@ -96,7 +96,11 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     image = Base64ImageField()
     author = CustomUserSerializer(read_only=True)
-    ingredients = serializers.SerializerMethodField()
+    ingredients = RecipeIngredientDetailSerializer(
+        source='recipe_ingredients',
+        many=True,
+        read_only=True
+    )
     tags = TagSerializer(many=True, read_only=True)
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
@@ -110,30 +114,24 @@ class RecipeSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'author', 'is_favorited',
                             'is_in_shopping_cart')
 
-    def get_ingredients(self, obj):
-        return RecipeIngredientDetailSerializer(
-            obj.recipe_ingredients.all(),
-            many=True
-        ).data
-
-    def get_is_favorited(self, obj):
+    def _check_relation(self, obj, relation_model):
         request = self.context.get('request')
         if not UserUtils.is_user_authenticated(request):
             return False
-        return Favorite.objects.filter(user=request.user, recipe=obj).exists()
-
-    def get_is_in_shopping_cart(self, obj):
-        request = self.context.get('request')
-        if not UserUtils.is_user_authenticated(request):
-            return False
-        return ShoppingList.objects.filter(
+        return relation_model.objects.filter(
             user=request.user,
             recipe=obj
         ).exists()
 
+    def get_is_favorited(self, obj):
+        return self._check_relation(obj, Favorite)
+
+    def get_is_in_shopping_cart(self, obj):
+        return self._check_relation(obj, ShoppingList)
+
     def validate(self, data):
-        ingredients_data = self.initial_data.get('ingredients', [])
-        tags_data = self.initial_data.get('tags', [])
+        ingredients_data = data.get('ingredients_data', [])
+        tags_data = data.get('tags_data', [])
 
         self._validate_ingredients(ingredients_data)
         self._validate_tags(tags_data)
@@ -234,8 +232,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
         recipe = Recipe.objects.create(**validated_data)
 
-        if tags_data:
-            recipe.tags.set(tags_data)
+        recipe.tags.set(tags_data)
 
         for ingredient_data in ingredients_data:
             amount = ingredient_data.get('amount')
@@ -262,21 +259,19 @@ class RecipeSerializer(serializers.ModelSerializer):
         if image:
             instance.image = image
 
-        if tags_data:
-            instance.tags.set(tags_data)
+        instance.tags.set(tags_data)
 
-        if ingredients_data:
-            instance.recipe_ingredients.all().delete()
-            for ingredient_data in ingredients_data:
-                amount = ingredient_data.get('amount')
-                ingredient = Ingredient.objects.get(
-                    id=ingredient_data.get('id')
-                )
-                RecipeIngredient.objects.create(
-                    recipe=instance,
-                    ingredient=ingredient,
-                    amount=amount
-                )
+        instance.recipe_ingredients.all().delete()
+        for ingredient_data in ingredients_data:
+            amount = ingredient_data.get('amount')
+            ingredient = Ingredient.objects.get(
+                id=ingredient_data.get('id')
+            )
+            RecipeIngredient.objects.create(
+                recipe=instance,
+                ingredient=ingredient,
+                amount=amount
+            )
 
         instance.save()
         return instance
