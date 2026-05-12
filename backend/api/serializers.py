@@ -234,7 +234,8 @@ class RecipeSerializer(serializers.ModelSerializer):
 
         recipe = Recipe.objects.create(**validated_data)
 
-        recipe.tags.set(tags_data)
+        if tags_data:
+            recipe.tags.set(tags_data)
 
         for ingredient_data in ingredients_data:
             amount = ingredient_data.get('amount')
@@ -261,18 +262,21 @@ class RecipeSerializer(serializers.ModelSerializer):
         if image:
             instance.image = image
 
-        instance.tags.set(tags_data)
-        instance.recipe_ingredients.all().delete()
-        for ingredient_data in ingredients_data:
-            amount = ingredient_data.get('amount')
-            ingredient = Ingredient.objects.get(
-                id=ingredient_data.get('id')
-            )
-            RecipeIngredient.objects.create(
-                recipe=instance,
-                ingredient=ingredient,
-                amount=amount
-            )
+        if tags_data:
+            instance.tags.set(tags_data)
+
+        if ingredients_data:
+            instance.recipe_ingredients.all().delete()
+            for ingredient_data in ingredients_data:
+                amount = ingredient_data.get('amount')
+                ingredient = Ingredient.objects.get(
+                    id=ingredient_data.get('id')
+                )
+                RecipeIngredient.objects.create(
+                    recipe=instance,
+                    ingredient=ingredient,
+                    amount=amount
+                )
 
         instance.save()
         return instance

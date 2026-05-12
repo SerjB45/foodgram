@@ -1,5 +1,6 @@
 import base64
 
+from django.db.models import Sum, F
 from django.shortcuts import get_object_or_404, redirect
 from django.http import HttpResponse
 from django.urls import reverse
@@ -13,7 +14,7 @@ from rest_framework.permissions import (AllowAny, IsAuthenticated,
 from rest_framework.response import Response
 
 from bookmark.models import Favorite, Follow, ShoppingList
-from recipes.models import Ingredient, Recipe, ShortLink, Tag
+from recipes.models import Ingredient, Recipe, RecipeIngredient, ShortLink, Tag
 from users.models import User
 from .filters import IngredientFilter, RecipeFilter
 from .mixins import RecipeActionMixin
@@ -115,10 +116,9 @@ class CustomUserViewSet(UserViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         serializer = AvatarSerializer(user, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -146,6 +146,16 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
     ordering_fields = ('name', 'pub_date', 'author__username',)
     ordering = ('-id',)
     pagination_class = CustomPagination
+
+    # def get_serializer_class(self):
+    #     """
+    #     Определяем, какой сериализатор использовать.
+    #     Для 'list' и 'retrieve' (чтение) используем RecipeReadSerializer.
+    #     Для остальных (создание, редактирование) — RecipeWriteSerializer.
+    #     """
+    #     if self.action in ['list', 'retrieve']:
+    #         return RecipeReadSerializer
+    #     return RecipeWriteSerializer
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -205,31 +215,28 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         permission_classes=(IsAuthenticated,),
     )
     def download_shopping_cart(self, request):
-        user = request.user
-        shopping_list = ShoppingList.objects.filter(
-            user=user).select_related('recipe')
-        if not shopping_list.exists():
+
+        ingredients_query = (
+            RecipeIngredient.objects
+            .filter(recipe__shopping_list__user=request.user)
+            .values('ingredient__name', 'ingredient__measurement_unit')
+            .annotate(total_amount=Sum(F('amount')))
+            .order_by('ingredient__name')
+        )
+
+        if not ingredients_query.exists():
             return Response(
                 {'errors': 'Список покупок пуст'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        ingredients = {}
-        for item in shopping_list:
-            recipe_ingredients = item.recipe.recipe_ingredients.select_related(
-                'ingredient')
-            for ri in recipe_ingredients:
-                name = ri.ingredient.name
-                amount = ri.amount
-                unit = ri.ingredient.measurement_unit
-                if name in ingredients:
-                    ingredients[name]['amount'] += amount
-                else:
-                    ingredients[name] = {'amount': amount, 'unit': unit}
-
         shop_list = 'Список покупок:\n\n'
-        for name, details in ingredients.items():
-            shop_list += f"{name}: {details['amount']} {details['unit']}\n"
+        for ingredient in ingredients_query:
+            shop_list += (
+                f"{ingredient['ingredient__name']}: "
+                f"{ingredient['total_amount']} "
+                f"{ingredient['ingredient__measurement_unit']}\n"
+            )
 
         response = HttpResponse(
             shop_list,
@@ -242,7 +249,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
 
 
 class StaticPagesViewSet(viewsets.ViewSet):
-    # Список доступных страниц
+    '''Статические страницы'''
     pages = {
         'about': {'title': 'О проекте'},
         'technologies': {'title': 'Технологии'}
