@@ -7,6 +7,7 @@ from .views import (
     RecipeViewSet,
     TagViewSet,
     redirect_short_link,
+    StaticPagesViewSet
 )
 
 
@@ -15,6 +16,7 @@ router.register(r'users', CustomUserViewSet, basename='users')
 router.register(r'tags', TagViewSet, basename='tags')
 router.register(r'ingredients', IngredientViewSet, basename='ingredients')
 router.register(r'recipes', RecipeViewSet, basename='recipes')
+router.register(r'pages', StaticPagesViewSet, basename='static-pages')
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/', include('djoser.urls')),
