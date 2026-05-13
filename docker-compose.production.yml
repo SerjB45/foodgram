@@ -21,7 +21,8 @@ services:
   frontend:
     image: sergey345bk/foodgram_frontend
     env_file: .env
-    command: cp -r /app/build/. /frontend_static/
+    command: sh -c "cp -r /app/build/. /frontend_static/ && tail -f /dev/null"
+    restart: unless-stopped
     volumes:
       - frontend_volume:/frontend_static
       - media_volume:/media
