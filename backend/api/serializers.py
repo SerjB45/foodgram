@@ -149,10 +149,19 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
     """Сериализатор для создания/обновления рецептов"""
 
     image = Base64ImageField()
+    ingredients = serializers.ListField(
+        child=serializers.DictField(),
+        write_only=True
+    )
+    tags = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True
+    )
 
     class Meta:
         model = Recipe
-        fields = ('name', 'image', 'text', 'cooking_time')
+        fields = ('name', 'image', 'text', 'cooking_time',
+                  'ingredients', 'tags')
 
     def to_representation(self, instance):
         """Используем RecipeReadSerializer для ответа."""
@@ -160,8 +169,8 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def validate(self, data):
-        ingredients_data = self.initial_data.get('ingredients', [])
-        tags_data = self.initial_data.get('tags', [])
+        ingredients_data = data.get('ingredients', [])
+        tags_data = data.get('tags', [])
 
         self._validate_ingredients(ingredients_data)
         self._validate_tags(tags_data)
@@ -265,8 +274,8 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         RecipeIngredient.objects.bulk_create(recipe_ingredients)
 
     def create(self, validated_data):
-        ingredients_data = self.initial_data.get('ingredients', [])
-        tags_data = self.initial_data.get('tags', [])
+        ingredients_data = validated_data.pop('ingredients', [])
+        tags_data = validated_data.pop('tags', [])
 
         recipe = Recipe.objects.create(**validated_data)
         self._set_tags(recipe, tags_data)
@@ -275,8 +284,8 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        ingredients_data = self.initial_data.get('ingredients')
-        tags_data = self.initial_data.get('tags')
+        ingredients_data = validated_data.pop('ingredients', [])
+        tags_data = validated_data.pop('tags', [])
 
         instance = super().update(instance, validated_data)
 
