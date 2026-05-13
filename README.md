@@ -24,7 +24,6 @@
 4. выполнить миграции 
 - sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate
 - sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic
-- sudo docker compose -f docker-compose.production.yml exec backend cp -r /app/collected_static/. /backend_static/static/
 5. Проверить доступность проекта по localhost
 
 ## 2 вариант(сборка проекта из исходников)
@@ -76,7 +75,6 @@ sudo docker compose up
 6. выполнить миграции 
 - sudo docker compose exec backend python manage.py migrate
 - sudo docker compose exec backend python manage.py collectstatic
-- sudo docker compose exec backend cp -r /app/collected_static/. /backend_static/static/
 
 7. Проверить доступность проекта по localhost
 
