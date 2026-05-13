@@ -19,7 +19,7 @@ from users.models import User
 from .filters import IngredientFilter, RecipeFilter
 from .mixins import RecipeActionMixin
 from .pagination import CustomPagination
-from .permissions import IsAuthorOrAdminOrReadOnly
+from .permissions import IsAuthorOrReadOnly
 from .serializers import (AvatarSerializer, CustomUserSerializer,
                           IngredientSerializer, RecipeWriteSerializer,
                           RecipeReadSerializer, SubscriptionSerializer,
@@ -27,6 +27,8 @@ from .serializers import (AvatarSerializer, CustomUserSerializer,
 
 
 class CustomUserViewSet(UserViewSet):
+    """Работа с пользователями и подписками."""
+
     queryset = User.objects.all()
     serializer_class = CustomUserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -48,6 +50,8 @@ class CustomUserViewSet(UserViewSet):
         url_path='subscriptions',
     )
     def subscriptions(self, request):
+        """Получение списка подписок текущего пользователя."""
+
         user = request.user
         queryset = User.objects.filter(following__user=user)
         page = self.paginate_queryset(queryset)
@@ -73,6 +77,8 @@ class CustomUserViewSet(UserViewSet):
         url_path='subscribe',
     )
     def subscribe(self, request, *args, **kwargs):
+        """Подписка/отписка на автора."""
+
         user = request.user
         author = self.get_object()
         follow = Follow.objects.filter(user=user, author=author)
@@ -108,6 +114,8 @@ class CustomUserViewSet(UserViewSet):
         permission_classes=(IsAuthenticated,),
     )
     def avatar(self, request):
+        """Загрузка и удаление аватара пользователя."""
+
         user = request.user
 
         if request.method == 'DELETE':
@@ -123,6 +131,8 @@ class CustomUserViewSet(UserViewSet):
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
+    """Работа с тегами."""
+
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_classes = (AllowAny,)
@@ -130,6 +140,8 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """Работа с ингредиентами."""
+
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     permission_classes = (AllowAny,)
@@ -139,8 +151,10 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
+    """Работа с рецептами."""
+
     queryset = Recipe.objects.all()
-    permission_classes = (IsAuthorOrAdminOrReadOnly,)
+    permission_classes = (IsAuthorOrReadOnly,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filterset_class = RecipeFilter
     ordering_fields = ('name', 'pub_date', 'author__username',)
@@ -163,6 +177,8 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         url_path='favorite',
     )
     def favorite(self, request, pk=None):
+        """Добавление/удаление рецепта из избранного."""
+
         return self._toggle_recipe_action(
             request, Favorite,
             'Рецепт уже в избранном',
@@ -176,6 +192,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         url_path='shopping_cart',
     )
     def shopping_cart(self, request, pk=None):
+        """Добавление/удаление рецепта из списка покупок."""
         return self._toggle_recipe_action(
             request, ShoppingList,
             'Рецепт уже в списке покупок',
@@ -189,6 +206,8 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         permission_classes=(AllowAny,),
     )
     def get_link(self, request, pk=None):
+        """Получение короткой ссылки на рецепт."""
+
         recipe = self.get_object()
         short_link, created = ShortLink.objects.get_or_create(
             recipe=recipe,
@@ -211,6 +230,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
         permission_classes=(IsAuthenticated,),
     )
     def download_shopping_cart(self, request):
+        """Скачивание списка покупок."""
 
         ingredients_query = (
             RecipeIngredient.objects
@@ -245,7 +265,7 @@ class RecipeViewSet(RecipeActionMixin, viewsets.ModelViewSet):
 
 
 class StaticPagesViewSet(viewsets.ViewSet):
-    '''Статические страницы'''
+    """Статические страницы"""
     pages = {
         'about': {'title': 'О проекте'},
         'technologies': {'title': 'Технологии'}
@@ -258,13 +278,14 @@ class StaticPagesViewSet(viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         if pk in self.pages:
             return Response(self.pages[pk])
-        else:
-            return Response(
-                {'error': 'Страница не найдена'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        return Response(
+            {'error': 'Страница не найдена'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 
 def redirect_short_link(request, short_code):
+    """Перенаправление с короткой ссылки на страницу рецепта."""
+
     short_link = get_object_or_404(ShortLink, short_code=short_code)
     return redirect(f'/recipes/{short_link.recipe.id}/')

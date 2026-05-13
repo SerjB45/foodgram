@@ -145,13 +145,32 @@ class RecipeReadSerializer(serializers.ModelSerializer):
         return self._check_relation(obj, ShoppingList)
 
 
-class RecipeWriteSerializer(RecipeReadSerializer):
-    """Сериализатор для создания/обновления рецептов.
-    Базовый класс - RecipeReadSerializer, так как поля в ответе совпадают."""
+class RecipeWriteSerializer(serializers.ModelSerializer):
+    """Сериализатор для создания/обновления рецептов"""
+
+    image = Base64ImageField()
+    ingredients = serializers.ListField(
+        child=serializers.DictField(),
+        write_only=True
+    )
+    tags = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True
+    )
+
+    class Meta:
+        model = Recipe
+        fields = ('name', 'image', 'text', 'cooking_time',
+                  'ingredients', 'tags')
+
+    def to_representation(self, instance):
+        """Используем RecipeReadSerializer для ответа."""
+        serializer = RecipeReadSerializer(instance, context=self.context)
+        return serializer.data
 
     def validate(self, data):
-        ingredients_data = data.get('ingredients_data', [])
-        tags_data = data.get('tags_data', [])
+        ingredients_data = data.get('ingredients', [])
+        tags_data = data.get('tags', [])
 
         self._validate_ingredients(ingredients_data)
         self._validate_tags(tags_data)
@@ -237,17 +256,6 @@ class RecipeWriteSerializer(RecipeReadSerializer):
                 {'tags': f'Теги с id {missing} не найдены.'}
             )
 
-    def to_internal_value(self, data):
-        """Переопределение метода для обработки
-        дополнительных полей ингредиентов и тегов."""
-
-        result = super().to_internal_value(data)
-        if 'ingredients' in self.initial_data:
-            result['ingredients_data'] = self.initial_data['ingredients']
-        if 'tags' in self.initial_data:
-            result['tags_data'] = self.initial_data['tags']
-        return result
-
     def _set_tags(self, recipe, tags_data):
         """Установить теги для рецепта."""
         recipe.tags.set(tags_data)
@@ -266,8 +274,8 @@ class RecipeWriteSerializer(RecipeReadSerializer):
         RecipeIngredient.objects.bulk_create(recipe_ingredients)
 
     def create(self, validated_data):
-        ingredients_data = validated_data.pop('ingredients_data', [])
-        tags_data = validated_data.pop('tags_data', [])
+        ingredients_data = validated_data.pop('ingredients', [])
+        tags_data = validated_data.pop('tags', [])
 
         recipe = Recipe.objects.create(**validated_data)
         self._set_tags(recipe, tags_data)
@@ -276,13 +284,15 @@ class RecipeWriteSerializer(RecipeReadSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        ingredients_data = validated_data.pop('ingredients_data', None)
-        tags_data = validated_data.pop('tags_data', None)
+        ingredients_data = validated_data.pop('ingredients', [])
+        tags_data = validated_data.pop('tags', [])
 
         instance = super().update(instance, validated_data)
 
-        self._set_tags(instance, tags_data)
-        self._set_ingredients(instance, ingredients_data)
+        if tags_data is not None:
+            self._set_tags(instance, tags_data)
+        if ingredients_data is not None:
+            self._set_ingredients(instance, ingredients_data)
 
         return instance
 
