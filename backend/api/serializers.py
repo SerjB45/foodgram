@@ -289,10 +289,8 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
         instance = super().update(instance, validated_data)
 
-        if tags_data is not None:
-            self._set_tags(instance, tags_data)
-        if ingredients_data is not None:
-            self._set_ingredients(instance, ingredients_data)
+        self._set_tags(instance, tags_data)
+        self._set_ingredients(instance, ingredients_data)
 
         return instance
 
